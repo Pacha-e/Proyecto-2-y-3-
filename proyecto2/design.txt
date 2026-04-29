@@ -1,0 +1,37 @@
+/*********
+* design.txt – Codificación binaria de instrucciones Shift Left y Shift Right
+* Autor: Emmanuel
+*********/
+
+Arquitectura de la instrucción Shift (Extensión de Universidad):
+
+Instrucción tipo C: 111 a c1 c2 c3 c4 c5 c6 ddd jjj
+                     [12] [11][10][ 9][ 8][ 7][ 6] [5..3] [2..0]
+                      a   zx  nx  zy  ny  f   no   dest   jump
+
+1. Gatillo del Modo Shift:
+   Se activa cuando zx=0, nx=0, ny=0, no=1.
+   (Independiente de zy y f).
+
+2. Selección de Fuente (zy / c3):
+   zy = 0 -> Desplazar el registro X (D en la CPU Hack).
+   zy = 1 -> Desplazar el registro Y (A o M según el bit 'a').
+
+3. Dirección del Desplazamiento (f / c5):
+   f = 0 -> Shift Left (<<).
+   f = 1 -> Shift Right (>>).
+
+TABLA DE CODIFICACIÓN COMPLETA (a + cccccc):
+
+| Mnemónico | a | zx | nx | zy | ny | f | no | Binario (7 bits) |
+|-----------|---|----|----|----|----|---|----|------------------|
+| D << 1    | 0 | 0  | 0  | 0  | 0  | 0 | 1  | 0 000001         |
+| A << 1    | 0 | 0  | 0  | 1  | 0  | 0 | 1  | 0 001001         |
+| M << 1    | 1 | 0  | 0  | 1  | 0  | 0 | 1  | 1 001001         |
+| D >> 1    | 0 | 0  | 0  | 0  | 0  | 1 | 1  | 0 000011         |
+| A >> 1    | 0 | 0  | 0  | 1  | 0  | 1 | 1  | 0 001011         |
+| M >> 1    | 1 | 0  | 0  | 1  | 0  | 1 | 1  | 1 001011         |
+
+Salida 'result' de la ALU:
+  Transporta el bit que fue desplazado hacia afuera (MSB en Left, LSB en Right).
+  Si no se está en modo shift, result = 0.

@@ -1,0 +1,71 @@
+/*********
+* ALU.hdl – ALU (Arithmetic Logic Unit) con extensión Shifter
+* Autor: Emmanuel
+*********/
+
+/**
+ * Standard Hack ALU with Shifter extension.
+ *
+ * Extension Detection:
+ *   When zx=0, nx=0, ny=0, no=1  →  Shift Mode
+ *
+ *   Source Selection (zy):
+ *     zy=0  →  shift x (D register)
+ *     zy=1  →  shift y (A or M)
+ *
+ *   Direction (f):
+ *     f=0   →  Shift Left
+ *     f=1   →  Shift Right
+ *
+ * Outputs:
+ *   out[16], zr, ng, result (shifted-out bit)
+ */
+CHIP ALU {
+    IN  x[16], y[16],
+        zx, nx, zy, ny, f, no;
+    OUT out[16], zr, ng, result;
+
+    PARTS:
+    // ── Standard ALU logic ──────────────────────────────────────────────────
+    Mux16(a=x,  b=false, sel=zx, out=x1);
+    Not16(in=x1, out=notX1);
+    Mux16(a=x1, b=notX1, sel=nx, out=x2);
+
+    Mux16(a=y,  b=false, sel=zy, out=y1);
+    Not16(in=y1, out=notY1);
+    Mux16(a=y1, b=notY1, sel=ny, out=y2);
+
+    And16(a=x2, b=y2, out=andXY);
+    Add16(a=x2, b=y2, out=addXY);
+    Mux16(a=andXY, b=addXY, sel=f, out=fOut);
+
+    Not16(in=fOut, out=notFOut);
+    Mux16(a=fOut, b=notFOut, sel=no, out=aluOut);
+
+    // ── Shift extension logic ───────────────────────────────────────────────
+    // Detect shift mode: zx=0, nx=0, ny=0, no=1
+    Not(in=zx, out=nzx);
+    Not(in=nx, out=nnx);
+    Not(in=ny, out=nny);
+    And(a=nzx, b=nnx, out=and1);
+    And(a=and1, b=nny, out=and2);
+    And(a=and2, b=no, out=shiftMode);
+
+    // Select input to shift (zy acts as selector in shift mode)
+    Mux16(a=x, b=y, sel=zy, out=shiftIn);
+    Shifter(in=shiftIn, direction=f, out=shiftOut, result=shiftResInternal);
+
+    // Select final output
+    Mux16(a=aluOut, b=shiftOut, sel=shiftMode, out=finalOut);
+
+    // Select final result (shifted bit only in shift mode)
+    And(a=shiftResInternal, b=shiftMode, out=result);
+
+    // ── Outputs and flags ──────────────────────────────────────────────────
+    Or16(a=finalOut, b=false, out=out, out[15]=ng, out[0..7]=low8, out[8..15]=high8);
+
+    Or8Way(in=low8,  out=orL);
+    Or8Way(in=high8, out=orH);
+    Or(a=orL, b=orH, out=notZero);
+    Not(in=notZero, out=zr);
+}

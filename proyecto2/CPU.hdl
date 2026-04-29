@@ -1,0 +1,52 @@
+/*********
+* CPU.hdl – Central Processing Unit
+* Autor: Emmanuel
+*********/
+
+/**
+ * Hack CPU.
+ */
+CHIP CPU {
+    IN  inM[16], instruction[16], reset;
+    OUT outM[16], writeM, addressM[15], pc[15];
+
+    PARTS:
+    Not(in=instruction[15], out=isA);
+
+    And(a=instruction[15], b=instruction[5], out=cWriteA);
+    Or(a=isA, b=cWriteA, out=loadA);
+
+    Mux16(a=instruction, b=aluOut, sel=instruction[15], out=aIn);
+    ARegister(in=aIn, load=loadA, out=aReg, out[0..14]=addressM);
+
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    DRegister(in=aluOut, load=loadD, out=dReg);
+
+    And(a=instruction[15], b=instruction[12], out=useM);
+    Mux16(a=aReg, b=inM, sel=useM, out=aluY);
+
+    ALU(x=dReg, y=aluY,
+        zx=instruction[11], nx=instruction[10],
+        zy=instruction[9],  ny=instruction[8],
+        f=instruction[7],   no=instruction[6],
+        out=aluOut, out=outM,
+        zr=zr, ng=ng,
+        result=shiftResult);
+
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    Or(a=ng, b=zr, out=ngOrZr);
+    Not(in=ngOrZr, out=pos);
+
+    And(a=instruction[2], b=ng,  out=jNeg);
+    And(a=instruction[1], b=zr,  out=jZero);
+    And(a=instruction[0], b=pos, out=jPos);
+
+    Or(a=jNeg, b=jZero, out=jNegOrZero);
+    Or(a=jNegOrZero, b=jPos, out=jumpCond);
+
+    And(a=instruction[15], b=jumpCond, out=doJump);
+    Not(in=doJump, out=incPC);
+
+    PC(in=aReg, load=doJump, inc=incPC, reset=reset, out[0..14]=pc);
+}
