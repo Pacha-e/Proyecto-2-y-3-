@@ -1,37 +1,22 @@
 /*********
-* ALU.hdl – ALU (Arithmetic Logic Unit) con extensión Shifter
+* ALU.hdl – ALU (Arithmetic Logic Unit) con Shifter integrado
 * Autor: Emmanuel
+*
+* Shifter inlineado (web IDE no soporta chips externos).
+* Shift mode: zx=0, nx=0, zy=0, ny=0, no=1
+*   f=0 → Shift Left (<<), f=1 → Shift Right (>>)
 *********/
-
-/**
- * Standard Hack ALU with Shifter extension.
- *
- * Extension Detection:
- *   When zx=0, nx=0, ny=0, no=1  →  Shift Mode
- *
- *   Source Selection (zy):
- *     zy=0  →  shift x (D register)
- *     zy=1  →  shift y (A or M)
- *
- *   Direction (f):
- *     f=0   →  Shift Left
- *     f=1   →  Shift Right
- *
- * Outputs:
- *   out[16], zr, ng, result (shifted-out bit)
- */
 CHIP ALU {
-    IN  x[16], y[16],
-        zx, nx, zy, ny, f, no;
+    IN  x[16], y[16], zx, nx, zy, ny, f, no;
     OUT out[16], zr, ng, result;
 
     PARTS:
-    // ── Standard ALU logic ──────────────────────────────────────────────────
-    Mux16(a=x,  b=false, sel=zx, out=x1);
+    // ── Standard ALU ─────────────────────────────────────────────────────
+    Mux16(a=x, b=false, sel=zx, out=x1);
     Not16(in=x1, out=notX1);
     Mux16(a=x1, b=notX1, sel=nx, out=x2);
 
-    Mux16(a=y,  b=false, sel=zy, out=y1);
+    Mux16(a=y, b=false, sel=zy, out=y1);
     Not16(in=y1, out=notY1);
     Mux16(a=y1, b=notY1, sel=ny, out=y2);
 
@@ -42,30 +27,51 @@ CHIP ALU {
     Not16(in=fOut, out=notFOut);
     Mux16(a=fOut, b=notFOut, sel=no, out=aluOut);
 
-    // ── Shift extension logic ───────────────────────────────────────────────
-    // Detect shift mode: zx=0, nx=0, ny=0, no=1
+    // ── Shift Extension (inlineada) ───────────────────────────────────────
+    // Trigger: zx=0, nx=0, zy=0, ny=0, no=1
     Not(in=zx, out=nzx);
     Not(in=nx, out=nnx);
+    Not(in=zy, out=nzy);
     Not(in=ny, out=nny);
-    And(a=nzx, b=nnx, out=and1);
-    And(a=and1, b=nny, out=and2);
-    And(a=and2, b=no, out=shiftMode);
+    And(a=nzx, b=nnx,  out=a1);
+    And(a=a1,  b=nzy,  out=a2);
+    And(a=a2,  b=nny,  out=a3);
+    And(a=a3,  b=no,   out=shiftMode);
 
-    // Select input to shift (zy acts as selector in shift mode)
-    Mux16(a=x, b=y, sel=zy, out=shiftIn);
-    Shifter(in=shiftIn, direction=f, out=shiftOut, result=shiftResInternal);
+    // f=0 → Left: out[0]=0, out[i]=x[i-1]
+    // f=1 → Right: out[15]=0, out[i]=x[i+1]
+    Mux(a=false, b=x[1],  sel=f, out=outS0);
+    Mux(a=x[0],  b=x[2],  sel=f, out=outS1);
+    Mux(a=x[1],  b=x[3],  sel=f, out=outS2);
+    Mux(a=x[2],  b=x[4],  sel=f, out=outS3);
+    Mux(a=x[3],  b=x[5],  sel=f, out=outS4);
+    Mux(a=x[4],  b=x[6],  sel=f, out=outS5);
+    Mux(a=x[5],  b=x[7],  sel=f, out=outS6);
+    Mux(a=x[6],  b=x[8],  sel=f, out=outS7);
+    Mux(a=x[7],  b=x[9],  sel=f, out=outS8);
+    Mux(a=x[8],  b=x[10], sel=f, out=outS9);
+    Mux(a=x[9],  b=x[11], sel=f, out=outS10);
+    Mux(a=x[10], b=x[12], sel=f, out=outS11);
+    Mux(a=x[11], b=x[13], sel=f, out=outS12);
+    Mux(a=x[12], b=x[14], sel=f, out=outS13);
+    Mux(a=x[13], b=x[15], sel=f, out=outS14);
+    Mux(a=x[14], b=false,  sel=f, out=outS15);
 
-    // Select final output
-    Mux16(a=aluOut, b=shiftOut, sel=shiftMode, out=finalOut);
+    // Result bit: Left → x[15], Right → x[0]
+    Mux(a=x[15], b=x[0], sel=f, out=shiftRes);
+    And(a=shiftRes, b=shiftMode, out=result);
 
-    // Select final result (shifted bit only in shift mode)
-    And(a=shiftResInternal, b=shiftMode, out=result);
+    // ── Output and Flags ──────────────────────────────────────────────────
+    Mux16(a=aluOut,
+          b[0]=outS0,  b[1]=outS1,  b[2]=outS2,  b[3]=outS3,
+          b[4]=outS4,  b[5]=outS5,  b[6]=outS6,  b[7]=outS7,
+          b[8]=outS8,  b[9]=outS9,  b[10]=outS10, b[11]=outS11,
+          b[12]=outS12, b[13]=outS13, b[14]=outS14, b[15]=outS15,
+          sel=shiftMode,
+          out=out, out[15]=ng, out[0..7]=lo, out[8..15]=hi);
 
-    // ── Outputs and flags ──────────────────────────────────────────────────
-    Or16(a=finalOut, b=false, out=out, out[15]=ng, out[0..7]=low8, out[8..15]=high8);
-
-    Or8Way(in=low8,  out=orL);
-    Or8Way(in=high8, out=orH);
-    Or(a=orL, b=orH, out=notZero);
-    Not(in=notZero, out=zr);
+    Or8Way(in=lo, out=orLo);
+    Or8Way(in=hi, out=orHi);
+    Or(a=orLo, b=orHi, out=notZr);
+    Not(in=notZr, out=zr);
 }
