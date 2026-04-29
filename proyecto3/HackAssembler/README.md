@@ -36,11 +36,13 @@ docs/API.md  DESIGN.md  USER_GUIDE.md
 
 ## Shift Instruction Encoding
 
-| Assembly | Binary comp field (7 bits) |
-|---|---|
-| `D<<1` / `A<<1` | `0000001` |
-| `M<<1`          | `1000001` |
-| `D>>1` / `A>>1` | `0000011` |
-| `M>>1`          | `1000011` |
+| Assembly | comp field (7 bits) | Note |
+|---|---|---|
+| `D<<1` | `0000001` | a=0, zy=0 |
+| `A<<1` | `0001001` | a=0, zy=1 |
+| `M<<1` | `1001001` | a=1, zy=1 |
+| `D>>1` | `0000011` | a=0, zy=0 |
+| `A>>1` | `0001011` | a=0, zy=1 |
+| `M>>1` | `1001011` | a=1, zy=1 |
 
 See `docs/DESIGN.md` for the full C-instruction bit layout.

@@ -33,7 +33,7 @@ def assemble(input_path: str) -> None:
         itype = parser.instructionType()
         if itype == 'A':
             sym = parser.symbol()
-            if sym.lstrip('-').isdigit():
+            if sym.isdigit():
                 value = int(sym)
             elif symbol_table.contains(sym):
                 value = symbol_table.getAddress(sym)

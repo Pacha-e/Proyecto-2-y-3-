@@ -46,21 +46,23 @@ Field:          1  1  1  a  c1 c2 c3 c4 c5 c6 d1 d2 d3 j1 j2 j3
 
 The university project adds two new instructions outside the standard Nand2Tetris ISA:
 
-| Assembly | Meaning | comp bits |
-|---|---|---|
-| `D=D<<1` | D ← D × 2 | `0000001` |
-| `D=A<<1` | D ← A × 2 | `0000001` |
-| `D=M<<1` | D ← M × 2 | `1000001` |
-| `D=D>>1` | D ← D / 2 | `0000011` |
-| `D=A>>1` | D ← A / 2 | `0000011` |
-| `D=M>>1` | D ← M / 2 | `1000011` |
+| Assembly | Meaning | comp bits | a | zy |
+|---|---|---|---|---|
+| `D=D<<1` | D ← D × 2 | `0000001` | 0 | 0 |
+| `D=A<<1` | D ← A × 2 | `0001001` | 0 | 1 |
+| `D=M<<1` | D ← M × 2 | `1001001` | 1 | 1 |
+| `D=D>>1` | D ← D / 2 | `0000011` | 0 | 0 |
+| `D=A>>1` | D ← A / 2 | `0001011` | 0 | 1 |
+| `D=M>>1` | D ← M / 2 | `1001011` | 1 | 1 |
 
-The `a` bit (bit 12) distinguishes register (`a=0`) from memory (`a=1`) source, consistent with standard Hack encoding.
+- The `a` bit (bit 12) distinguishes register (`a=0`) from memory (`a=1`) source.
+- The `zy` bit (c3, bit 9) selects the ALU y-input: 0 → D register, 1 → A/M.
+- All six shift variants have unique 7-bit comp patterns → full round-trip disassembly is possible without register tracking.
 
 ## Disassembler Design
 
 Reverse lookup of the same tables used by `Code.py`.  
-For shift instructions with `a=0`, the decoded mnemonic defaults to `D<<1`/`D>>1` because `A<<1` maps to the same bit pattern; full round-trip fidelity would require a register-tracking pass.
+All shift instructions have distinct bit patterns and round-trip correctly.
 
 ## Error Handling
 

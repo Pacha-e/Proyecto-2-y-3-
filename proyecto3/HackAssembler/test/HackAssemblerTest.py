@@ -237,6 +237,58 @@ class TestAssemblerIntegration(unittest.TestCase):
         lines = _assemble_source('D=M<<1\n')
         self.assertEqual(lines[0], '1111001001010000')
 
+    def test_add_asm(self):
+        """Standard Add.asm: R0 = 2 + 3."""
+        src = '@2\nD=A\n@3\nD=D+A\n@0\nM=D\n'
+        expected = [
+            '0000000000000010',
+            '1110110000010000',
+            '0000000000000011',
+            '1110000010010000',
+            '0000000000000000',
+            '1110001100001000',
+        ]
+        self.assertEqual(_assemble_source(src), expected)
+
+    def test_labels_and_jump(self):
+        """Label forward reference + unconditional jump."""
+        src = '(LOOP)\n@LOOP\n0;JMP\n'
+        expected = [
+            '0000000000000000',
+            '1110101010000111',
+        ]
+        self.assertEqual(_assemble_source(src), expected)
+
+    def test_variable_allocation(self):
+        """User-defined variable gets RAM address starting at 16."""
+        src = '@myVar\nM=D\n@myVar\nD=M\n'
+        lines = _assemble_source(src)
+        # @myVar → RAM[16] → 0000000000010000
+        self.assertEqual(lines[0], '0000000000010000')
+        # second reference to same variable → same address
+        self.assertEqual(lines[2], '0000000000010000')
+
+    def test_max_asm(self):
+        """Max.asm: R2 = max(R0, R1). Tests labels, D-A arithmetic, branching."""
+        src = (
+            '@R0\nD=M\n@R1\nD=D-M\n@OUTPUT_FIRST\nD;JGT\n'
+            '@R1\nD=M\n@OUTPUT_D\n0;JMP\n'
+            '(OUTPUT_FIRST)\n@R0\nD=M\n'
+            '(OUTPUT_D)\n@R2\nM=D\n'
+            '(INFINITE_LOOP)\n@INFINITE_LOOP\n0;JMP\n'
+        )
+        expected = [
+            '0000000000000000', '1111110000010000',
+            '0000000000000001', '1111010011010000',
+            '0000000000001010', '1110001100000001',
+            '0000000000000001', '1111110000010000',
+            '0000000000001100', '1110101010000111',
+            '0000000000000000', '1111110000010000',
+            '0000000000000010', '1110001100001000',
+            '0000000000001110', '1110101010000111',
+        ]
+        self.assertEqual(_assemble_source(src), expected)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Disassembler tests
@@ -260,6 +312,25 @@ class TestDisassembler(unittest.TestCase):
         code = Code()
         bits = '111' + code.comp('A<<1') + code.dest('D') + code.jump('')
         self.assertEqual(_decode_instruction(bits), 'D=A<<1')
+
+    def test_c_shift_right_D(self):
+        self.assertEqual(_decode_instruction('1110000011010000'), 'D=D>>1')
+
+    def test_c_shift_right_A(self):
+        self.assertEqual(_decode_instruction('1110001011010000'), 'D=A>>1')
+
+    def test_c_shift_right_M(self):
+        self.assertEqual(_decode_instruction('1111001011010000'), 'D=M>>1')
+
+    def test_round_trip_shift_right_D(self):
+        code = Code()
+        bits = '111' + code.comp('D>>1') + code.dest('D') + code.jump('')
+        self.assertEqual(_decode_instruction(bits), 'D=D>>1')
+
+    def test_round_trip_shift_right_M(self):
+        code = Code()
+        bits = '111' + code.comp('M>>1') + code.dest('D') + code.jump('')
+        self.assertEqual(_decode_instruction(bits), 'D=M>>1')
 
 
 if __name__ == '__main__':
